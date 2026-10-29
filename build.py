@@ -871,7 +871,21 @@ def w_photos_small():
                 items=[layer(items, title="Photo")])
 
 
+def w_test():
+    w, h = S
+    items = [
+        rect(0, 0, w, h, "#FF1C1C1E", RADIUS, "Background"),
+        text(PAD, 40, "KWGT 테스트", 30, WHITE, bold=True),
+        text(PAD, 100, "$df(h:mm)$", 84, WHITE, sample="10:09"),
+        text(PAD, 260, "이게 보이면 정상", 24, LABEL2),
+    ]
+    return dict(size=S, title="00 Test", glass=False,
+                desc="불러오기 확인용 최소 위젯 (수식·효과 없음)",
+                items=[layer(items, title="Test")])
+
+
 WIDGETS = {
+    "00_test": w_test,
     "clock_analog_small": w_clock_small,
     "clock_world_medium": w_world_clock,
     "clock_alarm_small": w_alarm_small,
@@ -908,9 +922,10 @@ def build_preset(spec):
     panel["position_anchor"] = "CENTER"
     del panel["position_offset_x"], panel["position_offset_y"]
     root = {"internal_type": "RootLayerModule", "viewgroup_items": [panel]}
-    formula(root, "config_scale_value",
-            f"$mu(min, si(rwidth)/{w + 2 * MARGIN}, "
-            f"si(rheight)/{h + 2 * MARGIN})*100$")
+    # Fixed scale: a root scale formula on si(rwidth) can evaluate to 0 on the
+    # home screen and shrink the whole widget to nothing. Resize the widget in
+    # KWGT's Layer tab (Scale) instead.
+    root["config_scale_value"] = 100.0
     globals_ = spec.get("globals") or {}
     if globals_:
         root["globals_list"] = {}
