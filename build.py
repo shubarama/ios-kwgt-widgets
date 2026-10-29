@@ -913,6 +913,7 @@ WIDGETS = {
 # Export.
 
 MARGIN = 14  # room for the glass shadow inside the widget cell
+ROOT_SCALE = 50.0
 
 
 def build_preset(spec):
@@ -922,10 +923,11 @@ def build_preset(spec):
     panel["position_anchor"] = "CENTER"
     del panel["position_offset_x"], panel["position_offset_y"]
     root = {"internal_type": "RootLayerModule", "viewgroup_items": [panel]}
-    # Fixed scale: a root scale formula on si(rwidth) can evaluate to 0 on the
-    # home screen and shrink the whole widget to nothing. Resize the widget in
-    # KWGT's Layer tab (Scale) instead.
-    root["config_scale_value"] = 100.0
+    # Layouts are drawn at 2x iOS points, but a KWGT 2x2 cell is ~185 units
+    # tall, so the root scales everything to 50% (= 1x iOS points). Fixed, not
+    # a si(rwidth) formula, which can evaluate to 0 on the home screen. Users
+    # fine-tune it in KWGT's Layer tab (Scale).
+    root["config_scale_value"] = ROOT_SCALE
     globals_ = spec.get("globals") or {}
     if globals_:
         root["globals_list"] = {}
@@ -938,8 +940,9 @@ def build_preset(spec):
         "archive": None, "author": "Phil iOS widget pack",
         "description": spec["desc"] + " · iOS 다크 모드 / Liquid Glass 스타일",
         "email": "", "features": spec.get("features", ""), "pflags": 0,
-        "height": h + 2 * MARGIN, "locked": False, "release": 377435216,
-        "title": spec["title"], "version": 13, "width": w + 2 * MARGIN,
+        "height": (h + 2 * MARGIN) * ROOT_SCALE / 100, "locked": False,
+        "release": 377435216, "title": spec["title"], "version": 13,
+        "width": (w + 2 * MARGIN) * ROOT_SCALE / 100,
         "xscreens": 0, "yscreens": 0,
     }
     return {"preset_info": info, "preset_root": root}
