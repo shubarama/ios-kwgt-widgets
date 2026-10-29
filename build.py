@@ -50,12 +50,18 @@ GOOGLE_CALENDAR = ("intent:#Intent;action=android.intent.action.MAIN;"
 
 
 # --------------------------------------------------------------------------
-# Module helpers. Every child is placed TOPLEFT + offset inside its parent
-# layer; "_s" carries preview-only sample values and is stripped on export.
+# Module helpers. Every child is placed TOPLEFT + left/top padding inside its
+# parent layer: KWGT ignores position_offset_* for children of an overlap
+# layer (seen on device), padding is what real presets use. "_s" carries
+# preview-only sample values and is stripped on export.
+
+PX, PY = "position_padding_left", "position_padding_top"
+
 
 def _base(kind, x, y, title=None):
+    assert x >= 0 and y >= 0, (kind, title, x, y)
     m = {"internal_type": kind, "position_anchor": "TOPLEFT",
-         "position_offset_x": float(x), "position_offset_y": float(y)}
+         PX: float(x), PY: float(y)}
     if title:
         m["internal_title"] = title
     return m
@@ -132,6 +138,12 @@ def ring(cx, cy, d, thick, level, fg, bg=FILL, sample=50, maximum=100,
 
 def layer(children, x=0, y=0, title=None, visible=None, tap=None,
           rotate=None, rotate_formula=None, sample_angle=0.0):
+    if (rotate or rotate_formula) and (x or y):
+        # Padding is part of a module's box, so a padded layer would rotate
+        # around the wrong point: position an unrotated wrapper instead.
+        inner = layer(children, title=title, rotate=rotate,
+                      rotate_formula=rotate_formula, sample_angle=sample_angle)
+        return layer([inner], x, y, f"{title} position", visible, tap)
     m = _base("OverlapLayerModule", x, y, title)
     m["viewgroup_items"] = children
     if visible:  # formula returning ALWAYS / REMOVE
@@ -246,7 +258,7 @@ def event_rows(x, y, n, step, title_size, time_size, width, ell):
         color_if(bar, "paint_color", f"$ci(color, {i})$", samples[i][2])
         rows.append(layer([
             bar,
-            text(18, -2, f"$tc(ell, ci(title, {i}), {ell})$", title_size,
+            text(18, 0, f"$tc(ell, ci(title, {i}), {ell})$", title_size,
                  WHITE, bold=True, width=width - 18, sample=samples[i][0]),
             text(18, title_size * 1.25, when, time_size, LABEL2,
                  width=width - 18, sample=samples[i][1]),
@@ -346,7 +358,7 @@ def daily_rows(w, y0, step):
         mn, mx, em = sample[i]
         seg = rect(bar_x, y + 14, 40, 8, GREEN, 4, f"Range {i}",
                    grad=(YELLOW, "HORIZONTAL"))
-        formula(seg, "position_offset_x",
+        formula(seg, PX,
                 f"${bar_x}+{bar_w}*(wf(min, {i})-gv(lo))/mu(max, 1, gv(hi)-gv(lo))$",
                 bar_x + bar_w * (mn - lo) / (hi - lo))
         formula(seg, "shape_width",
@@ -913,7 +925,6 @@ WIDGETS = {
 # Export.
 
 MARGIN = 14  # room for the glass shadow inside the widget cell
-ROOT_SCALE = 50.0
 
 
 def build_preset(spec):
@@ -921,13 +932,12 @@ def build_preset(spec):
     panel = (glass(w, h, spec.get("tint")) if spec.get("glass", True) else [])
     panel = layer(panel + spec["items"], title="Widget")
     panel["position_anchor"] = "CENTER"
-    del panel["position_offset_x"], panel["position_offset_y"]
+    del panel[PX], panel[PY]
     root = {"internal_type": "RootLayerModule", "viewgroup_items": [panel]}
-    # Layouts are drawn at 2x iOS points, but a KWGT 2x2 cell is ~185 units
-    # tall, so the root scales everything to 50% (= 1x iOS points). Fixed, not
-    # a si(rwidth) formula, which can evaluate to 0 on the home screen. Users
-    # fine-tune it in KWGT's Layer tab (Scale).
-    root["config_scale_value"] = ROOT_SCALE
+    # KWGT rescales a loaded preset to the widget cell from preset_info's
+    # width/height, so the root stays at 100% (a si(rwidth) formula can
+    # evaluate to 0 on the home screen). Users fine-tune it in the Layer tab.
+    root["config_scale_value"] = 100.0
     globals_ = spec.get("globals") or {}
     if globals_:
         root["globals_list"] = {}
@@ -940,9 +950,8 @@ def build_preset(spec):
         "archive": None, "author": "Phil iOS widget pack",
         "description": spec["desc"] + " · iOS 다크 모드 / Liquid Glass 스타일",
         "email": "", "features": spec.get("features", ""), "pflags": 0,
-        "height": (h + 2 * MARGIN) * ROOT_SCALE / 100, "locked": False,
-        "release": 377435216, "title": spec["title"], "version": 13,
-        "width": (w + 2 * MARGIN) * ROOT_SCALE / 100,
+        "height": h + 2 * MARGIN, "locked": False, "release": 377435216,
+        "title": spec["title"], "version": 13, "width": w + 2 * MARGIN,
         "xscreens": 0, "yscreens": 0,
     }
     return {"preset_info": info, "preset_root": root}
@@ -1003,15 +1012,15 @@ class Svg:
 
     def render(self, m, ox=0.0, oy=0.0):
         t = m["internal_type"]
-        x = ox + sample(m, "position_offset_x") if "position_offset_x" in m else ox
-        y = oy + sample(m, "position_offset_y") if "position_offset_y" in m else oy
+        x = ox + sample(m, PX) if PX in m else ox
+        y = oy + sample(m, PY) if PY in m else oy
         if t == "OverlapLayerModule":
             inner = "".join(self.render(c, x, y) for c in m["viewgroup_items"])
             ang = m.get("_s", {}).get("angle")
             if ang is not None:
                 box = m["viewgroup_items"][0]
-                cx = x + box["position_offset_x"] + box["shape_width"] / 2
-                cy = y + box["position_offset_y"] + box["shape_height"] / 2
+                cx = x + box[PX] + box["shape_width"] / 2
+                cy = y + box[PY] + box["shape_height"] / 2
                 return f'<g transform="rotate({ang} {cx} {cy})">{inner}</g>'
             return f"<g>{inner}</g>"
         if t == "ShapeModule":
