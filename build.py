@@ -925,6 +925,10 @@ WIDGETS = {
 # Export.
 
 MARGIN = 14  # room for the glass shadow inside the widget cell
+# preset_info width/height are device pixels: on load KWGT scales the root by
+# cell_px / info_px. Measured on device, a 2x2 cell needs ~111% for the
+# 368-unit small layout at info = 368, i.e. ~2 px per unit.
+INFO_PX = 2
 
 
 def build_preset(spec):
@@ -935,8 +939,9 @@ def build_preset(spec):
     del panel[PX], panel[PY]
     root = {"internal_type": "RootLayerModule", "viewgroup_items": [panel]}
     # KWGT rescales a loaded preset to the widget cell from preset_info's
-    # width/height, so the root stays at 100% (a si(rwidth) formula can
-    # evaluate to 0 on the home screen). Users fine-tune it in the Layer tab.
+    # width/height (see INFO_PX), so the root stays at 100% (a si(rwidth)
+    # formula can evaluate to 0 on the home screen). Users fine-tune it in
+    # the Layer tab.
     root["config_scale_value"] = 100.0
     globals_ = spec.get("globals") or {}
     if globals_:
@@ -950,8 +955,9 @@ def build_preset(spec):
         "archive": None, "author": "Phil iOS widget pack",
         "description": spec["desc"] + " · iOS 다크 모드 / Liquid Glass 스타일",
         "email": "", "features": spec.get("features", ""), "pflags": 0,
-        "height": h + 2 * MARGIN, "locked": False, "release": 377435216,
-        "title": spec["title"], "version": 13, "width": w + 2 * MARGIN,
+        "height": (h + 2 * MARGIN) * INFO_PX, "locked": False,
+        "release": 377435216, "title": spec["title"], "version": 13,
+        "width": (w + 2 * MARGIN) * INFO_PX,
         "xscreens": 0, "yscreens": 0,
     }
     return {"preset_info": info, "preset_root": root}
